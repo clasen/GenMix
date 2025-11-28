@@ -1,0 +1,71 @@
+process.loadEnvFile(); // Native Node.js .env loading (Node 20.12+)
+const { GeminiGenerator } = require('../index');
+const path = require('path');
+const fs = require('fs');
+
+async function main() {
+    try {
+        const generator = new GeminiGenerator();
+
+        // === Option 1: Use a local image ===
+        const localImagePath = path.join(__dirname, 'camera_4126.jpg');
+
+        if (fs.existsSync(localImagePath)) {
+            console.log('📸 Processing local image...\n');
+
+            const result1 = await generator.generate(
+                'Translate this image to Portuguese',
+                {
+                    referenceImage: localImagePath,
+                    quality: '2K',
+                    numberOfImages: 1
+                }
+            );
+
+            if (result1.images && result1.images.length > 0) {
+                const saved = generator.save(__dirname);
+                console.log('✅ Modified image saved at:', saved[0], '\n');
+            } else if (result1.text) {
+                console.log('📝 Result:', result1.text, '\n');
+            }
+        }
+
+
+        // === Option 3: Multiple variations of the same image ===
+        if (fs.existsSync(localImagePath)) {
+            console.log('🎨 Generating multiple variations...\n');
+
+            const result3 = await generator.generate(
+                'Add a vintage film look with grain and vignette effect',
+                {
+                    referenceImage: localImagePath,
+                    quality: '1K',
+                    numberOfImages: 3
+                }
+            );
+
+            if (result3.images && result3.images.length > 0) {
+                const saved = generator.save(__dirname);
+                console.log(`✅ ${saved.length} variations saved:`);
+                saved.forEach(p => console.log(`   - ${p}`));
+                console.log();
+            }
+        }
+
+        console.log('🎉 All examples completed successfully!\n');
+
+    } catch (error) {
+        console.error('❌ Error:', error.message);
+
+        if (error.message.includes('API Key')) {
+            console.error('\n💡 Tip: Make sure you have GEMINI_API_KEY in your .env file');
+        }
+
+        if (error.message.includes('reference image')) {
+            console.error('\n💡 Tip: Verify that the image path is correct');
+        }
+    }
+}
+
+main();
+

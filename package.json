@@ -1,0 +1,27 @@
+{
+  "name": "genmix",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "keywords": [
+    "ai",
+    "image-generator",
+    "google-gemini",
+    "gemini-api",
+    "text-to-image",
+    "image-modification",
+    "style-transfer",
+    "generative-ai",
+    "genmix"
+  ],
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "hash-factory": "^1.1.2"
+  }
+}
