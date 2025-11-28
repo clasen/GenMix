@@ -25,7 +25,7 @@ async function exampleBasicGeneration() {
     if (result.images && result.images.length > 0) {
         console.log(`Found ${result.images.length} images.`);
 
-        const savedPaths = generator.save(__dirname);
+        const savedPaths = await generator.save({ directory: __dirname });
         savedPaths.forEach(p => console.log(`Saved image to ${p}`));
     } else {
         console.log('No images generated.');

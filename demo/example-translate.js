@@ -17,13 +17,25 @@ async function main() {
                 'Translate this image to Portuguese',
                 {
                     referenceImage: localImagePath,
-                    quality: '2K',
+                    quality: '1K',
                     numberOfImages: 1
                 }
             );
 
             if (result1.images && result1.images.length > 0) {
-                const saved = generator.save(__dirname);
+                // Create pt directory if it doesn't exist
+                const ptDir = path.join(__dirname, 'pt');
+                if (!fs.existsSync(ptDir)) {
+                    fs.mkdirSync(ptDir, { recursive: true });
+                }
+                
+                // Use the same filename as the original
+                const originalName = path.basename(localImagePath, path.extname(localImagePath));
+                
+                const saved = await generator.save({ 
+                    directory: ptDir,
+                    filename: originalName
+                });
                 console.log('✅ Modified image saved at:', saved[0], '\n');
             } else if (result1.text) {
                 console.log('📝 Result:', result1.text, '\n');
@@ -31,26 +43,26 @@ async function main() {
         }
 
 
-        // === Option 3: Multiple variations of the same image ===
-        if (fs.existsSync(localImagePath)) {
-            console.log('🎨 Generating multiple variations...\n');
+        // // === Option 3: Multiple variations of the same image ===
+        // if (fs.existsSync(localImagePath)) {
+        //     console.log('🎨 Generating multiple variations...\n');
 
-            const result3 = await generator.generate(
-                'Add a vintage film look with grain and vignette effect',
-                {
-                    referenceImage: localImagePath,
-                    quality: '1K',
-                    numberOfImages: 3
-                }
-            );
+        //     const result3 = await generator.generate(
+        //         'Add a vintage film look with grain and vignette effect',
+        //         {
+        //             referenceImage: localImagePath,
+        //             quality: '1K',
+        //             numberOfImages: 3
+        //         }
+        //     );
 
-            if (result3.images && result3.images.length > 0) {
-                const saved = generator.save(__dirname);
-                console.log(`✅ ${saved.length} variations saved:`);
-                saved.forEach(p => console.log(`   - ${p}`));
-                console.log();
-            }
-        }
+        //     if (result3.images && result3.images.length > 0) {
+        //         const saved = await generator.save({ directory: __dirname });
+        //         console.log(`✅ ${saved.length} variations saved:`);
+        //         saved.forEach(p => console.log(`   - ${p}`));
+        //         console.log();
+        //     }
+        // }
 
         console.log('🎉 All examples completed successfully!\n');
 

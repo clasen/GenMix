@@ -1,11 +1,13 @@
 {
   "name": "genmix",
-  "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
-  "author": "",
+  "version": "1.0.2",
+  "description": "AI-powered image generator using Google Gemini API. Supports image generation from text prompts and image modification with reference images.",
+  "license": "MIT",
+  "author": "Martin Clasen",
   "keywords": [
-    "ai",
+    "nano",
+    "banana",
+    "pro",
     "image-generator",
     "google-gemini",
     "gemini-api",
@@ -13,7 +15,8 @@
     "image-modification",
     "style-transfer",
     "generative-ai",
-    "genmix"
+    "genmix",
+    "clasen"
   ],
   "type": "commonjs",
   "main": "index.js",
@@ -22,6 +25,7 @@
   },
   "dependencies": {
     "axios": "^1.13.2",
-    "hash-factory": "^1.1.2"
+    "hash-factory": "^1.1.2",
+    "sharp": "^0.33.5"
   }
 }

@@ -45,7 +45,7 @@ const result = await generator.generate(
 );
 
 // Save images
-const savedPaths = generator.save('./output');
+const savedPaths = await generator.save({ directory: './output' });
 console.log('Images saved:', savedPaths);
 ```
 
@@ -62,7 +62,7 @@ const result = await generator.generate(
   }
 );
 
-const savedPaths = generator.save('./output');
+const savedPaths = await generator.save({ directory: './output' });
 ```
 
 ### Using URLs as Reference
@@ -76,7 +76,7 @@ const result = await generator.generate(
   }
 );
 
-generator.save('./output');
+generator.save({ directory: './output' });
 ```
 
 ## Configuration Options
@@ -105,6 +105,46 @@ await generator.generate(prompt, options)
 | `options.numberOfImages` | number        | Number of images to generate                | 1       |
 | `options.quality`        | string        | Quality: '1K', '2K', '4K'                   | -       |
 | `options.aspectRatio`    | string        | Aspect ratio: '1:1', '16:9', '4:3', etc.    | -       |
+
+### save() Method
+
+```javascript
+await generator.save(options)
+```
+
+**Parameters:**
+
+| Option              | Type   | Description                                      | Default |
+| ------------------- | ------ | ------------------------------------------------ | ------- |
+| `options.directory` | string | Target directory path to save images             | `'.'`   |
+| `options.filename`  | string | Custom filename (without extension). If not provided, uses hash-based filename | -       |
+| `options.extension` | string | File format: 'jpg', 'png', 'webp', 'avif', 'tiff' | `'jpg'` |
+
+**Examples:**
+
+```javascript
+// Save to specific directory with auto-generated filename (jpg by default)
+await generator.save({ directory: './output' });
+
+// Save as PNG
+await generator.save({ directory: './output', extension: 'png' });
+
+// Save to specific directory with custom filename
+await generator.save({ directory: './output', filename: 'my-image' });
+
+// Save as WebP with custom filename
+await generator.save({ directory: './output', filename: 'my-image', extension: 'webp' });
+
+// Save to current directory with custom filename
+await generator.save({ filename: 'my-image' });
+
+// Save to current directory with auto-generated filename (jpg)
+await generator.save();
+```
+
+**Note:** 
+- When multiple images are generated and a custom filename is provided, they will be saved as `filename_0.jpg`, `filename_1.jpg`, etc.
+- The method uses Sharp for image conversion, supporting high-quality format conversion
 
 ## Advanced Examples
 
@@ -179,7 +219,7 @@ try {
   const result = await generator.generate(prompt, options);
   
   if (result.images && result.images.length > 0) {
-    const paths = generator.save('./output');
+    const paths = generator.save({ directory: './output' });
     console.log('Success!', paths);
   } else {
     console.log('No images generated');
