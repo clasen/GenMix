@@ -42,29 +42,7 @@ async function main() {
             }
         }
 
-
-        // // === Option 3: Multiple variations of the same image ===
-        // if (fs.existsSync(localImagePath)) {
-        //     console.log('🎨 Generating multiple variations...\n');
-
-        //     const result3 = await generator.generate(
-        //         'Add a vintage film look with grain and vignette effect',
-        //         {
-        //             referenceImage: localImagePath,
-        //             quality: '1K',
-        //             numberOfImages: 3
-        //         }
-        //     );
-
-        //     if (result3.images && result3.images.length > 0) {
-        //         const saved = await generator.save({ directory: __dirname });
-        //         console.log(`✅ ${saved.length} variations saved:`);
-        //         saved.forEach(p => console.log(`   - ${p}`));
-        //         console.log();
-        //     }
-        // }
-
-        console.log('🎉 All examples completed successfully!\n');
+        console.log('🎉 Example completed successfully!\n');
 
     } catch (error) {
         console.error('❌ Error:', error.message);
