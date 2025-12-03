@@ -26,9 +26,10 @@ class BaseGenerator {
      * @param {string} [options.directory='.'] - Target directory path. Defaults to current directory.
      * @param {string} [options.filename] - Optional custom filename (without extension). If not provided, uses hashed filenames.
      * @param {string} [options.extension='jpg'] - File extension: 'jpg', 'png', 'webp', 'avif', 'tiff'. Defaults to 'jpg'.
+     * @param {Object} [options.formatOptions] - Format-specific options (quality, compressionLevel, palette, colours, etc.)
      * @returns {Promise<string[]>} Promise that resolves to array of saved file paths.
      */
-    async save({directory = '.', filename = null, extension = 'jpg'} = {}) {
+    async save({directory = '.', filename = null, extension = 'jpg', formatOptions = null} = {}) {
         const targetImages = this.lastGeneration?.images;
         const targetPrompt = this.lastGeneration?.prompt;
 
@@ -44,6 +45,11 @@ class BaseGenerator {
         // Ensure directory exists
         if (!fs.existsSync(directory)) {
             fs.mkdirSync(directory, { recursive: true });
+        }
+
+        // Use format from formatOptions if provided, otherwise use extension
+        if (formatOptions && formatOptions.format) {
+            extension = formatOptions.format;
         }
 
         // Normalize extension
@@ -84,8 +90,46 @@ class BaseGenerator {
 
             // Convert image format using sharp
             try {
-                await sharp(buffer)
-                    .toFormat(sharpFormat)
+                let sharpInstance = sharp(buffer);
+                
+                // Resize if dimensions are specified in formatOptions
+                if (formatOptions && formatOptions.width && formatOptions.height) {
+                    sharpInstance = sharpInstance.resize(formatOptions.width, formatOptions.height, {
+                        fit: 'fill'
+                    });
+                }
+                
+                // Build format-specific options
+                const sharpFormatOptions = {};
+                
+                if (formatOptions) {
+                    if (sharpFormat === 'jpg' && formatOptions.quality) {
+                        sharpFormatOptions.quality = formatOptions.quality;
+                    } else if (sharpFormat === 'png') {
+                        if (formatOptions.compressionLevel !== undefined) {
+                            sharpFormatOptions.compressionLevel = formatOptions.compressionLevel;
+                        }
+                        if (formatOptions.quality !== undefined) {
+                            sharpFormatOptions.quality = formatOptions.quality;
+                        }
+                        if (formatOptions.effort !== undefined) {
+                            sharpFormatOptions.effort = formatOptions.effort;
+                        }
+                        if (formatOptions.palette) {
+                            sharpFormatOptions.palette = true;
+                            // Add dithering for better quality with palette
+                            sharpFormatOptions.dither = 1.0;
+                        }
+                        if (formatOptions.colours) {
+                            sharpFormatOptions.colours = formatOptions.colours;
+                        }
+                    } else if (sharpFormat === 'webp' && formatOptions.quality) {
+                        sharpFormatOptions.quality = formatOptions.quality;
+                    }
+                }
+                
+                await sharpInstance
+                    .toFormat(sharpFormat, sharpFormatOptions)
                     .toFile(outputPath);
                 
                 savedPaths.push(outputPath);

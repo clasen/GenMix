@@ -32,9 +32,15 @@ async function main() {
                 // Use the same filename as the original
                 const originalName = path.basename(localImagePath, path.extname(localImagePath));
                 
+                // Get reference metadata to match format
+                const refMetadata = generator.getReferenceMetadata();
+                console.log('📊 Reference format:', refMetadata);
+                
+                // Save with same format as reference
                 const saved = await generator.save({ 
                     directory: ptDir,
-                    filename: originalName
+                    filename: originalName,
+                    formatOptions: refMetadata
                 });
                 console.log('✅ Modified image saved at:', saved[0], '\n');
             } else if (result1.text) {
