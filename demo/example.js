@@ -1,6 +1,5 @@
-process.loadEnvFile(); // Native Node.js .env loading (Node 20.12+)
-const { GeminiGenerator } = require('../index');
-
+process.loadEnvFile();
+import { GeminiGenerator } from '../index.js';
 
 async function exampleBasicGeneration() {
     console.log('\n=== Example 1: Basic Image Generation ===\n');
@@ -12,7 +11,7 @@ async function exampleBasicGeneration() {
     console.log('Generating image...');
     const result = await generator.generate(prompt, {
         numberOfImages: 2,
-        quality: '1K', // Options: 1K, 2K, 4K
+        quality: '1K',
         aspectRatio: '1:1'
     });
 
@@ -25,20 +24,16 @@ async function exampleBasicGeneration() {
     if (result.images && result.images.length > 0) {
         console.log(`Found ${result.images.length} images.`);
 
-        const savedPaths = await generator.save({ directory: __dirname });
+        const savedPaths = await generator.save({ directory: import.meta.dirname });
         savedPaths.forEach(p => console.log(`Saved image to ${p}`));
     } else {
         console.log('No images generated.');
     }
 }
 
-
-
 async function main() {
     try {
-        // Example 1: Basic generation
         await exampleBasicGeneration();
-
         console.log('\n=== All examples completed! ===\n');
     } catch (error) {
         console.error('Error:', error.message);

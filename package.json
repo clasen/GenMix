@@ -8,6 +8,7 @@
     "nano",
     "banana",
     "pro",
+    "flash",
     "image-generator",
     "google-gemini",
     "gemini-api",
@@ -24,7 +25,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "axios": "^1.13.2",
+    "axios": "^1.13.6",
     "hash-factory": "^1.1.2",
     "sharp": "^0.33.5"
   }

@@ -1,14 +1,13 @@
-process.loadEnvFile(); // Native Node.js .env loading (Node 20.12+)
-const { GeminiGenerator } = require('../index');
-const path = require('path');
-const fs = require('fs');
+process.loadEnvFile();
+import { GeminiGenerator } from '../index.js';
+import path from 'path';
+import fs from 'fs';
 
 async function main() {
     try {
         const generator = new GeminiGenerator();
 
-        // === Option 1: Use a local image ===
-        const localImagePath = path.join(__dirname, 'camera_4126.jpg');
+        const localImagePath = path.join(import.meta.dirname, 'camera_4126.jpg');
 
         if (fs.existsSync(localImagePath)) {
             console.log('📸 Processing local image...\n');
@@ -23,21 +22,17 @@ async function main() {
             );
 
             if (result1.images && result1.images.length > 0) {
-                // Create pt directory if it doesn't exist
-                const ptDir = path.join(__dirname, 'pt');
+                const ptDir = path.join(import.meta.dirname, 'pt');
                 if (!fs.existsSync(ptDir)) {
                     fs.mkdirSync(ptDir, { recursive: true });
                 }
-                
-                // Use the same filename as the original
+
                 const originalName = path.basename(localImagePath, path.extname(localImagePath));
-                
-                // Get reference metadata to match format
+
                 const refMetadata = generator.getReferenceMetadata();
                 console.log('📊 Reference format:', refMetadata);
-                
-                // Save with same format as reference
-                const saved = await generator.save({ 
+
+                const saved = await generator.save({
                     directory: ptDir,
                     filename: originalName,
                     formatOptions: refMetadata
@@ -64,4 +59,3 @@ async function main() {
 }
 
 main();
-

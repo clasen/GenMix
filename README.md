@@ -17,6 +17,13 @@ AI-powered image generator using Google Gemini API. Supports image generation fr
 npm install genmix
 ```
 
+### AI Skill
+You can also add GenMix as a skill for AI agentic development:
+
+```bash
+npx skills add https://github.com/clasen/GenMix --skill genmix
+```
+
 ## Setup
 
 Create a `.env` file in your project root:
@@ -27,10 +34,47 @@ GEMINI_API_KEY=your_api_key_here
 
 ## Basic Usage
 
+### The Power of GenMix: Multiple References & Chainable API
+
+GenMix shines when combining multiple images with specific instructions using its intuitive chainable API:
+
+```javascript
+import { GeminiGenerator } from 'genmix';
+const generator = new GeminiGenerator();
+
+const result = await generator
+  .pro() // Use the Pro model for best results
+  .addReference('./person.jpg', 'Use this person as the main subject')
+  .addReference('./background.jpg', 'Use this as the background setting')
+  .generate('A photo of the person standing in the background setting, cinematic lighting');
+
+await generator.save({ filename: 'composite-result' });
+```
+
+### Model Selection
+
+You can easily switch between the Pro and Flash models using chainable methods:
+
+```javascript
+import { GeminiGenerator } from 'genmix';
+
+const generator = new GeminiGenerator();
+
+// Use the Pro model
+await generator
+  .pro()
+  .generate('A highly detailed portrait of a cat');
+
+// Switch to the Flash model
+await generator
+  .flash()
+  .generate('A quick sketch of a dog');
+```
+
 ### Simple Image Generation
 
 ```javascript
-const { GeminiGenerator } = require('genmix');
+import { GeminiGenerator } from 'genmix';
 
 const generator = new GeminiGenerator();
 
@@ -88,6 +132,23 @@ new GeminiGenerator({
   apiKey: string,           // Your Google API key (required)
   modelId: string           // Model to use (optional, default: 'gemini-3-pro-image-preview')
 })
+```
+
+### Model Selection Methods
+
+```javascript
+generator.pro()    // Switches to the gemini-3-pro-image-preview model
+generator.flash()  // Switches to the gemini-3.1-flash-image-preview model
+```
+Both methods are chainable and return the generator instance.
+
+### Reference Methods
+
+You can also use chainable methods to add one or multiple reference images before calling `generate()`:
+
+```javascript
+generator.addReference(image, description) // Adds a reference image (path, URL, Buffer)
+generator.clearReferences()                // Removes all queued reference images
 ```
 
 ### generate() Method
@@ -190,7 +251,7 @@ const result = await generator.generate(
 ### Using Buffers
 
 ```javascript
-const fs = require('fs');
+import fs from 'fs';
 const imageBuffer = fs.readFileSync('./image.png');
 
 const result = await generator.generate(

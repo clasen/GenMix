@@ -4,10 +4,15 @@ const fs = require('fs');
 const path = require('path');
 
 class GeminiGenerator extends BaseGenerator {
+    static MODELS = {
+        PRO: 'gemini-3-pro-image-preview',
+        FLASH: 'gemini-3.1-flash-image-preview',
+    };
+
     /**
      * @param {Object} [config]
      * @param {string} [config.apiKey]
-     * @param {string} [config.modelId]
+     * @param {string} [config.modelId] - Model ID or use GeminiGenerator.MODELS constants
      */
     constructor(config = {}) {
         super(config);
@@ -16,20 +21,56 @@ class GeminiGenerator extends BaseGenerator {
         if (!this.apiKey) {
             throw new Error('API Key is required. Provide it in the constructor or set GEMINI_API_KEY environment variable.');
         }
-        // Use the specific model for image generation or default to pro-vision if needed
-        // However, for standard image generation via prompt, specific models like 'gemini-1.5-pro' or 'imagen-3.0-generate-001' are often used.
-        // Keeping the user's modelId preference.
-        this.modelId = config.modelId || 'gemini-3-pro-image-preview';
-        // NOTE: For simple generation, we might not need streamGenerateContent unless we want text streaming.
-        // But let's stick to what worked for text, and adjust the body.
+        this.modelId = config.modelId || GeminiGenerator.MODELS.FLASH;
         this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelId}:streamGenerateContent`;
         this.referenceMetadata = null;
+        this.references = [];
+    }
+
+    /**
+     * Add a reference image to be included in the next generate() call.
+     * @param {string|Buffer} image - Path to image file, URL, base64 data URI, or Buffer
+     * @param {string} [description] - How the model should use this image (e.g. 'use as background')
+     * @returns {GeminiGenerator} this instance for chaining
+     */
+    addReference(image, description = '') {
+        this.references.push({ image, description });
+        return this;
+    }
+
+    /**
+     * Remove all queued reference images.
+     * @returns {GeminiGenerator} this instance for chaining
+     */
+    clearReferences() {
+        this.references = [];
+        return this;
+    }
+
+    /**
+     * Switch to the Pro model
+     * @returns {GeminiGenerator} this instance for chaining
+     */
+    pro() {
+        this.modelId = GeminiGenerator.MODELS.PRO;
+        this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelId}:streamGenerateContent`;
+        return this;
+    }
+
+    /**
+     * Switch to the Flash model
+     * @returns {GeminiGenerator} this instance for chaining
+     */
+    flash() {
+        this.modelId = GeminiGenerator.MODELS.FLASH;
+        this.apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.modelId}:streamGenerateContent`;
+        return this;
     }
 
     /**
      * @param {string} prompt
      * @param {Object} [options]
-     * @param {string|Buffer} [options.referenceImage] - Path to image file, base64 data URI, or Buffer
+     * @param {string|Buffer} [options.referenceImage] - Path to image file, base64 data URI, or Buffer (legacy single-image API)
      * @param {string} [options.numberOfImages] - Number of images to generate
      * @param {string} [options.quality] - Image quality: '1K', '2K', '4K'
      * @param {string} [options.aspectRatio] - Aspect ratio like '1:1', '16:9', etc.
@@ -55,6 +96,8 @@ class GeminiGenerator extends BaseGenerator {
             text: result.text,
             raw: result.raw
         };
+
+        this.references = [];
 
         return result;
     }
@@ -225,27 +268,42 @@ class GeminiGenerator extends BaseGenerator {
         }
     }
 
-    async _generateSingleRequest(prompt, options) {
-        const url = `${this.apiUrl}?key=${this.apiKey}`;
-
-        // Build the parts array
+    /**
+     * Builds the API parts array from queued references + prompt.
+     * Each reference becomes [inlineData, text description (if any)], followed by the main prompt.
+     * @param {string} prompt
+     * @returns {Promise<Object[]>}
+     * @private
+     */
+    async _buildReferenceParts(prompt) {
         const parts = [];
 
-        // Add reference image if provided
-        if (options.referenceImage) {
-            const imageData = await this._processReferenceImage(options.referenceImage);
+        for (const ref of this.references) {
+            const imageData = await this._processReferenceImage(ref.image);
             parts.push({
                 inlineData: {
                     mimeType: imageData.mimeType,
                     data: imageData.data
                 }
             });
+            if (ref.description) {
+                parts.push({ text: `Reference: ${ref.description}` });
+            }
         }
 
-        // Add text prompt
-        parts.push({
-            text: prompt,
-        });
+        parts.push({ text: prompt });
+        return parts;
+    }
+
+    async _generateSingleRequest(prompt, options) {
+        const url = `${this.apiUrl}?key=${this.apiKey}`;
+
+        // Legacy single-image API: promote to references for unified code path
+        if (options.referenceImage && this.references.length === 0) {
+            this.addReference(options.referenceImage);
+        }
+
+        const parts = await this._buildReferenceParts(prompt);
 
         // Simplified data structure to minimize conflicts
         const data = {

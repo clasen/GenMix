@@ -1,15 +1,14 @@
-process.loadEnvFile(); // Native Node.js .env loading (Node 20.12+)
-const { GeminiGenerator } = require('../index');
-const path = require('path');
-const fs = require('fs');
+process.loadEnvFile();
+import { GeminiGenerator } from '../index.js';
+import path from 'path';
+import fs from 'fs';
 
 async function main() {
     try {
         const generator = new GeminiGenerator();
 
-        // === Multiple variations of the same image ===
-        const localImagePath = path.join(__dirname, 'camera_4126.jpg');
-        
+        const localImagePath = path.join(import.meta.dirname, 'camera_4126.jpg');
+
         if (fs.existsSync(localImagePath)) {
             console.log('🎨 Generating multiple variations...\n');
 
@@ -23,7 +22,7 @@ async function main() {
             );
 
             if (result.images && result.images.length > 0) {
-                const saved = await generator.save({ directory: __dirname });
+                const saved = await generator.save({ directory: import.meta.dirname });
                 console.log(`✅ ${saved.length} variations saved:`);
                 saved.forEach(p => console.log(`   - ${p}`));
                 console.log();
@@ -46,4 +45,3 @@ async function main() {
 }
 
 main();
-
