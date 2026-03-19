@@ -1,6 +1,6 @@
 {
   "name": "genmix",
-  "version": "1.0.5",
+  "version": "1.1.5",
   "description": "AI-powered image generator using Google Gemini API. Supports image generation from text prompts and image modification with reference images.",
   "license": "MIT",
   "author": "Martin Clasen",
@@ -17,10 +17,14 @@
     "style-transfer",
     "generative-ai",
     "genmix",
+    "cli",
     "clasen"
   ],
   "type": "commonjs",
   "main": "index.js",
+  "bin": {
+    "genmix": "./cli.js"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

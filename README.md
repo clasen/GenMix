@@ -166,6 +166,8 @@ await generator.generate(prompt, options)
 | `options.numberOfImages` | number        | Number of images to generate                | 1       |
 | `options.quality`        | string        | Quality: '1K', '2K', '4K'                   | -       |
 | `options.aspectRatio`    | string        | Aspect ratio: '1:1', '16:9', '4:3', etc.    | -       |
+| `options.width`          | number        | Final output width in pixels (requires `height`) | -   |
+| `options.height`         | number        | Final output height in pixels (requires `width`) | -   |
 
 ### save() Method
 
@@ -202,6 +204,25 @@ await generator.save({ filename: 'my-image' });
 // Save to current directory with auto-generated filename (jpg)
 await generator.save();
 ```
+
+### Smart target size in library mode (non-CLI)
+
+You can request high generation quality and still force an exact final output size directly in `generate()`:
+
+```javascript
+const generator = new GeminiGenerator();
+
+await generator.generate('App icon, flat minimal style', {
+  quality: '4K', // generation quality (independent)
+  width: 400,
+  height: 400
+});
+
+// width/height resize is automatically applied on save()
+await generator.save({ filename: 'icon-400x400', extension: 'png' });
+```
+
+If you also pass `aspectRatio`, it must match the ratio derived from `width`/`height`.
 
 **Note:** 
 - When multiple images are generated and a custom filename is provided, they will be saved as `filename_0.jpg`, `filename_1.jpg`, etc.
@@ -329,6 +350,112 @@ genmix/
 3. **Image Size**: Reference images between 512x512 and 2048x2048 work best
 
 4. **Result Caching**: Images are automatically saved with unique hash based on the prompt
+
+## CLI Usage
+
+### Global CLI Installation
+
+Install GenMix globally to use it from the command line:
+
+```bash
+npm install -g genmix
+```
+
+### First run and API key persistence
+
+If no API key is available, the CLI asks for it on first use and saves it to:
+
+```text
+~/.genmix/config.json
+```
+
+You can set or update it explicitly anytime:
+
+```bash
+genmix --config
+```
+
+API key resolution order in CLI:
+1. `GEMINI_API_KEY` environment variable
+2. Saved config (`~/.genmix/config.json`)
+3. Interactive prompt (then persisted)
+
+### Basic CLI commands
+
+```bash
+# Show help
+genmix --help
+
+# Generate from prompt
+genmix "A futuristic city with flying cars, cyberpunk style"
+
+# Generate multiple images
+genmix "A cozy cabin in winter" -n 2 -q 2K -r 16:9 -m flash
+```
+
+### Output file path or directory
+
+`--output` accepts either:
+- a directory path, or
+- a full output file path (including filename + extension)
+
+```bash
+# Save to a directory (auto-generated hash filename)
+genmix "Watercolor fox logo" --output ./output
+
+# Save to exact file path and filename
+genmix "Watercolor fox logo" --output ./output/logo-fox.png
+```
+
+### Smart target size (independent from generation quality)
+
+You can ask the model for high generation quality (for example `4K`) and still force a final exact output size.
+
+When you pass target dimensions, GenMix CLI:
+1. Derives the generation ratio automatically (for example `400x400` -> `1:1`, `1920x1080` -> `16:9`)
+2. Generates using your selected quality (`1K`, `2K`, or `4K`)
+3. Resizes the final image to the exact dimensions you requested
+
+```bash
+# Ask for 4K quality, deliver exact 400x400 output
+genmix "app icon, flat minimal style" -q 4K --width 400 --height 400 --output ./output/icon.png
+```
+
+If you also pass `--ratio`, it must match the derived ratio from the target size.
+
+### References with optional text description
+
+Use `--ref <path:text>` to add reference images with optional guidance text:
+
+```bash
+# Reference path only
+genmix "Restyle this room" --ref ./room.jpg
+
+# Reference path + description
+genmix "Restyle this room" --ref "./room.jpg:keep composition and camera angle"
+
+# Multiple references with descriptions
+genmix "Create product ad scene" \
+  --ref "./product.png:use as main subject" \
+  --ref "./bg.jpg:use as background mood"
+```
+
+### CLI options
+
+```text
+-n, --number <N>          Number of images (default: 1)
+-q, --quality <1K|2K|4K>  Image quality (default: 1K)
+-r, --ratio <ratio>       Aspect ratio (default: 1:1)
+-m, --model <pro|flash>   Model (default: flash)
+-o, --output <path>       Output directory or full output file path
+-f, --format <format>     Output format when output is a directory (default: jpg)
+--width <px>              Final output width in pixels (requires --height)
+--height <px>             Final output height in pixels (requires --width)
+--ref <path:text>         Reference image, optional description after ":"
+--no-sharp                Save raw model bytes without Sharp conversion (disables resizing)
+--config                  Set/update persisted API key
+--help                    Show help
+```
 
 ## Additional Resources
 

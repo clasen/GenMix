@@ -29,9 +29,13 @@ class BaseGenerator {
      * @param {Object} [options.formatOptions] - Format-specific options (quality, compressionLevel, palette, colours, etc.)
      * @returns {Promise<string[]>} Promise that resolves to array of saved file paths.
      */
-    async save({directory = '.', filename = null, extension = 'jpg', formatOptions = null} = {}) {
+    async save({directory = '.', filename = null, extension = 'jpg', formatOptions = null, useSharp = true} = {}) {
         const targetImages = this.lastGeneration?.images;
         const targetPrompt = this.lastGeneration?.prompt;
+        const inheritedFormatOptions = this.lastGeneration?.formatOptions || null;
+        const effectiveFormatOptions = formatOptions
+            ? { ...(inheritedFormatOptions || {}), ...formatOptions }
+            : inheritedFormatOptions;
 
         if (!targetImages || !Array.isArray(targetImages) || targetImages.length === 0) {
             console.warn('No images to save.');
@@ -48,8 +52,8 @@ class BaseGenerator {
         }
 
         // Use format from formatOptions if provided, otherwise use extension
-        if (formatOptions && formatOptions.format) {
-            extension = formatOptions.format;
+        if (effectiveFormatOptions && effectiveFormatOptions.format) {
+            extension = effectiveFormatOptions.format;
         }
 
         // Normalize extension
@@ -69,32 +73,43 @@ class BaseGenerator {
         
         for (let index = 0; index < targetImages.length; index++) {
             const imgData = targetImages[index];
-            const base64Data = imgData.replace(/^data:image\/\w+;base64,/, "");
+            const mimeMatch = imgData.match(/^data:image\/([a-zA-Z0-9.+-]+);base64,/);
+            const sourceFormat = mimeMatch ? mimeMatch[1].toLowerCase() : null;
+            const normalizedSourceFormat = sourceFormat === 'jpeg' ? 'jpg' : sourceFormat;
+            const base64Data = imgData.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "");
             const buffer = Buffer.from(base64Data, 'base64');
+
+            const effectiveExtension = useSharp ? fileExtension : (normalizedSourceFormat || fileExtension);
 
             let fileName;
             if (filename) {
                 // Use custom filename, add index if multiple images
                 if (targetImages.length > 1) {
-                    fileName = `${filename}_${index}.${fileExtension}`;
+                    fileName = `${filename}_${index}.${effectiveExtension}`;
                 } else {
-                    fileName = `${filename}.${fileExtension}`;
+                    fileName = `${filename}.${effectiveExtension}`;
                 }
             } else {
                 // Use hash-based filename
                 const hash = this.generateHash(targetPrompt + '_' + index);
-                fileName = `${hash}.${fileExtension}`;
+                fileName = `${hash}.${effectiveExtension}`;
             }
             
             const outputPath = path.join(directory, fileName);
+
+            if (!useSharp) {
+                fs.writeFileSync(outputPath, buffer);
+                savedPaths.push(outputPath);
+                continue;
+            }
 
             // Convert image format using sharp
             try {
                 let sharpInstance = sharp(buffer);
                 
                 // Resize if dimensions are specified in formatOptions
-                if (formatOptions && formatOptions.width && formatOptions.height) {
-                    sharpInstance = sharpInstance.resize(formatOptions.width, formatOptions.height, {
+                if (effectiveFormatOptions && effectiveFormatOptions.width && effectiveFormatOptions.height) {
+                    sharpInstance = sharpInstance.resize(effectiveFormatOptions.width, effectiveFormatOptions.height, {
                         fit: 'fill'
                     });
                 }
@@ -102,29 +117,29 @@ class BaseGenerator {
                 // Build format-specific options
                 const sharpFormatOptions = {};
                 
-                if (formatOptions) {
-                    if (sharpFormat === 'jpg' && formatOptions.quality) {
-                        sharpFormatOptions.quality = formatOptions.quality;
+                if (effectiveFormatOptions) {
+                    if (sharpFormat === 'jpg' && effectiveFormatOptions.quality) {
+                        sharpFormatOptions.quality = effectiveFormatOptions.quality;
                     } else if (sharpFormat === 'png') {
-                        if (formatOptions.compressionLevel !== undefined) {
-                            sharpFormatOptions.compressionLevel = formatOptions.compressionLevel;
+                        if (effectiveFormatOptions.compressionLevel !== undefined) {
+                            sharpFormatOptions.compressionLevel = effectiveFormatOptions.compressionLevel;
                         }
-                        if (formatOptions.quality !== undefined) {
-                            sharpFormatOptions.quality = formatOptions.quality;
+                        if (effectiveFormatOptions.quality !== undefined) {
+                            sharpFormatOptions.quality = effectiveFormatOptions.quality;
                         }
-                        if (formatOptions.effort !== undefined) {
-                            sharpFormatOptions.effort = formatOptions.effort;
+                        if (effectiveFormatOptions.effort !== undefined) {
+                            sharpFormatOptions.effort = effectiveFormatOptions.effort;
                         }
-                        if (formatOptions.palette) {
+                        if (effectiveFormatOptions.palette) {
                             sharpFormatOptions.palette = true;
                             // Add dithering for better quality with palette
                             sharpFormatOptions.dither = 1.0;
                         }
-                        if (formatOptions.colours) {
-                            sharpFormatOptions.colours = formatOptions.colours;
+                        if (effectiveFormatOptions.colours) {
+                            sharpFormatOptions.colours = effectiveFormatOptions.colours;
                         }
-                    } else if (sharpFormat === 'webp' && formatOptions.quality) {
-                        sharpFormatOptions.quality = formatOptions.quality;
+                    } else if (sharpFormat === 'webp' && effectiveFormatOptions.quality) {
+                        sharpFormatOptions.quality = effectiveFormatOptions.quality;
                     }
                 }
                 

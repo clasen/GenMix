@@ -67,6 +67,55 @@ class GeminiGenerator extends BaseGenerator {
         return this;
     }
 
+    _gcd(a, b) {
+        let x = Math.abs(a);
+        let y = Math.abs(b);
+        while (y !== 0) {
+            const t = y;
+            y = x % y;
+            x = t;
+        }
+        return x || 1;
+    }
+
+    _deriveAspectRatio(width, height) {
+        const divisor = this._gcd(width, height);
+        return `${width / divisor}:${height / divisor}`;
+    }
+
+    _normalizeGenerateOptions(options = {}) {
+        const normalizedOptions = { ...options };
+        const hasWidth = normalizedOptions.width !== undefined && normalizedOptions.width !== null;
+        const hasHeight = normalizedOptions.height !== undefined && normalizedOptions.height !== null;
+
+        if (hasWidth !== hasHeight) {
+            throw new Error('Both options.width and options.height are required together.');
+        }
+
+        if (hasWidth && hasHeight) {
+            const width = Number(normalizedOptions.width);
+            const height = Number(normalizedOptions.height);
+
+            if (!Number.isInteger(width) || width <= 0) {
+                throw new Error('options.width must be a positive integer.');
+            }
+            if (!Number.isInteger(height) || height <= 0) {
+                throw new Error('options.height must be a positive integer.');
+            }
+
+            const derivedRatio = this._deriveAspectRatio(width, height);
+            if (normalizedOptions.aspectRatio && normalizedOptions.aspectRatio !== derivedRatio) {
+                throw new Error(`Aspect ratio mismatch: options.aspectRatio ${normalizedOptions.aspectRatio} does not match options.width/options.height (${derivedRatio}).`);
+            }
+
+            normalizedOptions.aspectRatio = derivedRatio;
+            normalizedOptions.width = width;
+            normalizedOptions.height = height;
+        }
+
+        return normalizedOptions;
+    }
+
     /**
      * @param {string} prompt
      * @param {Object} [options]
@@ -74,19 +123,22 @@ class GeminiGenerator extends BaseGenerator {
      * @param {string} [options.numberOfImages] - Number of images to generate
      * @param {string} [options.quality] - Image quality: '1K', '2K', '4K'
      * @param {string} [options.aspectRatio] - Aspect ratio like '1:1', '16:9', etc.
+     * @param {number} [options.width] - Final output width in pixels (requires options.height)
+     * @param {number} [options.height] - Final output height in pixels (requires options.width)
      * @returns {Promise<{images: string[], text: string, raw: any}>}
      */
     async generate(prompt, options = {}) {
+        const normalizedOptions = this._normalizeGenerateOptions(options);
         // If the user asks for multiple images, we might need to make parallel requests
         // if the API doesn't support candidateCount > 1 for images.
         // Based on search results, candidateCount > 1 can cause 400 errors.
-        const numberOfImages = options.numberOfImages || 1;
+        const numberOfImages = normalizedOptions.numberOfImages || 1;
 
         let result;
         if (numberOfImages > 1) {
-            result = await this.generateMultiple(prompt, numberOfImages, options);
+            result = await this.generateMultiple(prompt, numberOfImages, normalizedOptions);
         } else {
-            result = await this._generateSingleRequest(prompt, options);
+            result = await this._generateSingleRequest(prompt, normalizedOptions);
         }
 
         // Store result in state for saveImages()
@@ -94,7 +146,10 @@ class GeminiGenerator extends BaseGenerator {
             prompt: prompt,
             images: result.images,
             text: result.text,
-            raw: result.raw
+            raw: result.raw,
+            formatOptions: normalizedOptions.width && normalizedOptions.height
+                ? { width: normalizedOptions.width, height: normalizedOptions.height }
+                : null
         };
 
         this.references = [];
