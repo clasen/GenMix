@@ -1,6 +1,6 @@
 # 🎨 GenMix
 
-AI-powered image generator using Google Gemini API. Supports image generation from text prompts and image modification with reference images.
+AI-powered image generator supporting Google Gemini and Fal Nano Banana 2. Supports image generation from text prompts and image modification with reference images (Gemini).
 
 ## Features ✨
 
@@ -30,7 +30,10 @@ Create a `.env` file in your project root:
 
 ```env
 GEMINI_API_KEY=your_api_key_here
+FAL_API_KEY=your_fal_api_key_here
 ```
+
+`GEMINI_API_KEY` is used with provider `gemini` and `FAL_API_KEY` is used with provider `fal`.
 
 ## Basic Usage
 
@@ -50,6 +53,26 @@ const result = await generator
 
 await generator.save({ filename: 'composite-result' });
 ```
+
+### Provider Selection (Gemini or Fal)
+
+```javascript
+import { GeminiGenerator, FalGenerator } from 'genmix';
+
+const gemini = new GeminiGenerator({ apiKey: process.env.GEMINI_API_KEY });
+const fal = new FalGenerator({ apiKey: process.env.FAL_API_KEY });
+
+await gemini.flash().generate('A cinematic portrait with dramatic lighting');
+await fal.generate('A cinematic portrait with dramatic lighting', {
+  numberOfImages: 1,
+  quality: '1K',
+  aspectRatio: '1:1'
+});
+```
+
+Fal models available in this integration:
+- `flash` (or `banana2`) -> `fal-ai/nano-banana-2/edit` (image-to-image editing)
+- `pro` (or `banana-pro`) -> `fal-ai/nano-banana-pro/edit` (image-to-image editing)
 
 ### Model Selection
 
@@ -134,6 +157,13 @@ new GeminiGenerator({
 })
 ```
 
+```javascript
+new FalGenerator({
+  apiKey: string,           // Your Fal API key (required)
+  modelId: string           // Optional: FalGenerator.MODELS.BANANA_2 or BANANA_PRO_EDIT
+})
+```
+
 ### Model Selection Methods
 
 ```javascript
@@ -141,6 +171,15 @@ generator.pro()    // Switches to the gemini-3-pro-image-preview model
 generator.flash()  // Switches to the gemini-3.1-flash-image-preview model
 ```
 Both methods are chainable and return the generator instance.
+
+Fal generator model methods:
+
+```javascript
+fal.banana2()   // fal-ai/nano-banana-2/edit (image editing)
+fal.bananaPro() // fal-ai/nano-banana-pro/edit (image editing)
+fal.pro()       // alias of bananaPro()
+fal.flash()     // alias of banana2()
+```
 
 ### Reference Methods
 
@@ -150,6 +189,8 @@ You can also use chainable methods to add one or multiple reference images befor
 generator.addReference(image, description) // Adds a reference image (path, URL, Buffer)
 generator.clearReferences()                // Removes all queued reference images
 ```
+
+For `fal` (`flash` and `pro`), references can be URL, data URI, local file path, or Buffer.
 
 ### generate() Method
 
@@ -323,7 +364,8 @@ try {
 genmix/
 └── generators/
 │   ├── BaseGenerator.js      # Base class with utilities
-│   └── GeminiGenerator.js    # Gemini API implementation
+│   ├── GeminiGenerator.js    # Gemini API implementation
+│   └── FalGenerator.js       # Fal Nano Banana 2 implementation
 ├── demo/
 │   ├── example.js                # Basic examples
 │   └── example-translation.js    # Translate image
@@ -376,8 +418,8 @@ genmix --config
 ```
 
 API key resolution order in CLI:
-1. `GEMINI_API_KEY` environment variable
-2. Saved config (`~/.genmix/config.json`)
+1. Provider-specific environment variable (`GEMINI_API_KEY` or `FAL_API_KEY`)
+2. Saved config (`~/.genmix/config.json`) using `geminiApiKey`/`apiKey` or `falApiKey`
 3. Interactive prompt (then persisted)
 
 ### Basic CLI commands
@@ -391,6 +433,12 @@ genmix "A futuristic city with flying cars, cyberpunk style"
 
 # Generate multiple images
 genmix "A cozy cabin in winter" -n 2 -q 2K -r 16:9 -m flash
+
+# Use Fal Nano Banana 2 edit (flash) with reference
+genmix "Restyle this room with warm sunset mood" --provider fal -m flash --ref "./room.jpg" -n 2 -q 2K -r 16:9
+
+# Use Fal Nano Banana Pro (edit) with reference
+genmix "make this scene cinematic" --provider fal -m banana-pro --ref "https://example.com/input.png"
 ```
 
 ### Output file path or directory
@@ -438,6 +486,11 @@ genmix "Restyle this room" --ref "./room.jpg:keep composition and camera angle"
 genmix "Create product ad scene" \
   --ref "./product.png:use as main subject" \
   --ref "./bg.jpg:use as background mood"
+
+# References for fal models (URL, data URI, or local path)
+genmix "Edit this image for a magazine look" \
+  --provider fal -m flash \
+  --ref "./photo.png"
 ```
 
 ### CLI options
@@ -445,13 +498,15 @@ genmix "Create product ad scene" \
 ```text
 -n, --number <N>          Number of images (default: 1)
 -q, --quality <1K|2K|4K>  Image quality (default: 1K)
--r, --ratio <ratio>       Aspect ratio (default: 1:1)
--m, --model <pro|flash>   Model (default: flash)
+-p, --provider <gemini|fal> Provider (default: gemini)
+-r, --ratio <ratio>       Aspect ratio (default: 1:1 for gemini, auto for fal)
+-m, --model <...>         gemini: pro|flash (default: flash)
+                          fal: pro|flash (aliases: banana-pro|banana2|2, default: flash)
 -o, --output <path>       Output directory or full output file path
 -f, --format <format>     Output format when output is a directory (default: jpg)
 --width <px>              Final output width in pixels (requires --height)
 --height <px>             Final output height in pixels (requires --width)
---ref <path:text>         Reference image, optional description after ":"
+--ref <path[:text]>       Reference image (path/URL/data URI); for URL descriptions use URL::description
 --no-sharp                Save raw model bytes without Sharp conversion (disables resizing)
 --config                  Set/update persisted API key
 --help                    Show help
@@ -461,6 +516,8 @@ genmix "Create product ad scene" \
 
 - [Code Examples](./demo/)
 - [Google Gemini API Documentation](https://ai.google.dev/)
+- [Fal Nano Banana 2 Edit Documentation](https://fal.ai/models/fal-ai/nano-banana-2/edit/api)
+- [Fal Nano Banana Pro Edit Documentation](https://fal.ai/models/fal-ai/nano-banana-pro/edit/api)
 
 ## License
 

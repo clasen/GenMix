@@ -5,6 +5,7 @@ const path = require('path');
 const os = require('os');
 const readline = require('readline');
 const GeminiGenerator = require('./generators/GeminiGenerator');
+const FalGenerator = require('./generators/FalGenerator');
 
 const CONFIG_DIR = path.join(os.homedir(), '.genmix');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
@@ -72,6 +73,14 @@ async function promptApiKey() {
     return apiKey;
 }
 
+async function promptFalApiKey() {
+    const apiKey = (await promptQuestion('Enter your Fal API key: ')).trim();
+    if (!apiKey) {
+        throw new Error('API key cannot be empty.');
+    }
+    return apiKey;
+}
+
 function printHelp() {
     console.log(`
 Usage:
@@ -80,21 +89,27 @@ Usage:
   genmix --help
 
 Options:
+  -p, --provider <gemini|fal> Provider (default: gemini)
   -n, --number <N>        Number of images (default: 1)
   -q, --quality <1K|2K|4K> Image quality (default: 1K)
-  -r, --ratio <ratio>     Aspect ratio (default: 1:1)
+  -r, --ratio <ratio>     Aspect ratio (default: 1:1 for gemini, auto for fal)
   --width <px>            Final output width in pixels (requires --height)
   --height <px>           Final output height in pixels (requires --width)
-  -m, --model <pro|flash> Model (default: flash)
+  -m, --model <...>       Model by provider:
+                          gemini -> pro|flash (default: flash)
+                          fal -> pro|flash (aliases: banana-pro|banana2|2, default: flash)
   -o, --output <path>     Output directory OR full output file path
   -f, --format <format>   Output format when output is a directory (default: jpg)
   --no-sharp              Save raw model bytes without Sharp conversion
-  --ref <path:text>       Reference image; optional description after ":" (repeatable)
+  --ref <path[:text]>     Reference image; optional description after ":" (repeatable)
+                          For URLs, use plain URL or URL::description
   --help                  Show this help message
   --config                Set or update persisted API key
 
 Examples:
   genmix "cyberpunk city at night"
+  genmix "restyle this room" --provider fal --ref ./room.jpg
+  genmix "edit this image with sunset light" --provider fal -m banana-pro --ref "https://example.com/photo.jpg"
   genmix "logo in watercolor style" -n 2 -q 2K -o ./output
   genmix "app icon" -q 4K --width 400 --height 400 --output ./renders/icon.png
   genmix "new version of this room" --ref room.jpg:"keep composition"
@@ -103,13 +118,26 @@ Examples:
 }
 
 function parseRefValue(value) {
-    const firstColonIndex = value.indexOf(':');
-    if (firstColonIndex === -1) {
-        return { imagePath: value.trim(), description: '' };
+    const raw = value.trim();
+    const explicitSeparatorIndex = raw.indexOf('::');
+    if (explicitSeparatorIndex !== -1) {
+        return {
+            imagePath: raw.slice(0, explicitSeparatorIndex).trim(),
+            description: raw.slice(explicitSeparatorIndex + 2).trim()
+        };
     }
 
-    const imagePath = value.slice(0, firstColonIndex).trim();
-    const description = value.slice(firstColonIndex + 1).trim();
+    if (/^https?:\/\//i.test(raw)) {
+        return { imagePath: raw, description: '' };
+    }
+
+    const firstColonIndex = raw.indexOf(':');
+    if (firstColonIndex === -1) {
+        return { imagePath: raw, description: '' };
+    }
+
+    const imagePath = raw.slice(0, firstColonIndex).trim();
+    const description = raw.slice(firstColonIndex + 1).trim();
     return { imagePath, description };
 }
 
@@ -117,11 +145,13 @@ function parseArgs(argv) {
     const parsed = {
         promptParts: [],
         references: [],
+        provider: 'gemini',
         numberOfImages: 1,
         quality: '1K',
         aspectRatio: null,
         aspectRatioWasProvided: false,
-        model: 'flash',
+        model: null,
+        modelWasProvided: false,
         output: '.',
         format: 'jpg',
         targetWidth: null,
@@ -159,6 +189,13 @@ function parseArgs(argv) {
             continue;
         }
 
+        if (arg === '-p' || arg === '--provider') {
+            if (!next) throw new Error(`${arg} requires a value.`);
+            parsed.provider = String(next).toLowerCase();
+            i += 1;
+            continue;
+        }
+
         if (arg === '-r' || arg === '--ratio') {
             if (!next) throw new Error(`${arg} requires a value.`);
             parsed.aspectRatio = next;
@@ -184,6 +221,7 @@ function parseArgs(argv) {
         if (arg === '-m' || arg === '--model') {
             if (!next) throw new Error(`${arg} requires a value.`);
             parsed.model = String(next).toLowerCase();
+            parsed.modelWasProvided = true;
             i += 1;
             continue;
         }
@@ -235,8 +273,24 @@ function parseArgs(argv) {
     }
     parsed.quality = quality;
 
-    if (!['flash', 'pro'].includes(parsed.model)) {
-        throw new Error('Model must be "flash" or "pro".');
+    if (!['gemini', 'fal'].includes(parsed.provider)) {
+        throw new Error('Provider must be "gemini" or "fal".');
+    }
+
+    if (parsed.provider === 'gemini' && !parsed.modelWasProvided) {
+        parsed.model = 'flash';
+    }
+
+    if (parsed.provider === 'fal' && !parsed.modelWasProvided) {
+        parsed.model = 'flash';
+    }
+
+    if (parsed.provider === 'gemini' && !['flash', 'pro'].includes(parsed.model)) {
+        throw new Error('Model must be "flash" or "pro" when provider is "gemini".');
+    }
+
+    if (parsed.provider === 'fal' && !['flash', 'pro', 'banana2', 'banana-pro', '2'].includes(parsed.model)) {
+        throw new Error('Model must be "flash" or "pro" when provider is "fal" (aliases: banana2, banana-pro, 2).');
     }
 
     const hasOnlyOneDimension = (parsed.targetWidth === null) !== (parsed.targetHeight === null);
@@ -259,7 +313,7 @@ function parseArgs(argv) {
     }
 
     if (!parsed.aspectRatioWasProvided && !hasTargetDimensions) {
-        parsed.aspectRatio = '1:1';
+        parsed.aspectRatio = parsed.provider === 'fal' ? 'auto' : '1:1';
     }
 
     for (const ref of parsed.references) {
@@ -292,48 +346,95 @@ function resolveOutput(outputArg, format) {
     };
 }
 
-async function ensureApiKey() {
+async function ensureApiKey(provider = 'gemini') {
     const config = loadConfig();
+
+    if (provider === 'fal') {
+        const envApiKey = process.env.FAL_API_KEY;
+        if (envApiKey && envApiKey.trim()) {
+            return envApiKey.trim();
+        }
+        if (config.falApiKey && config.falApiKey.trim()) {
+            return config.falApiKey.trim();
+        }
+
+        info('No Fal API key found. Let us configure it now.');
+        const newApiKey = await promptFalApiKey();
+        saveConfig({ ...config, falApiKey: newApiKey });
+        success(`Fal API key saved to ${CONFIG_PATH}`);
+        return newApiKey;
+    }
+
     const envApiKey = process.env.GEMINI_API_KEY;
     if (envApiKey && envApiKey.trim()) {
         return envApiKey.trim();
+    }
+    if (config.geminiApiKey && config.geminiApiKey.trim()) {
+        return config.geminiApiKey.trim();
     }
     if (config.apiKey && config.apiKey.trim()) {
         return config.apiKey.trim();
     }
 
-    info('No API key found. Let us configure it now.');
+    info('No Gemini API key found. Let us configure it now.');
     const newApiKey = await promptApiKey();
-    saveConfig({ ...config, apiKey: newApiKey });
-    success(`API key saved to ${CONFIG_PATH}`);
+    saveConfig({ ...config, apiKey: newApiKey, geminiApiKey: newApiKey });
+    success(`Gemini API key saved to ${CONFIG_PATH}`);
     return newApiKey;
 }
 
-async function runConfigCommand() {
+async function runConfigCommand(provider) {
     const existing = loadConfig();
-    if (existing.apiKey) {
-        info(`Existing API key found in ${CONFIG_PATH}.`);
+    if (provider === 'fal') {
+        if (existing.falApiKey) {
+            info(`Existing Fal API key found in ${CONFIG_PATH}.`);
+        } else {
+            info('No saved Fal API key found.');
+        }
+
+        const newApiKey = await promptFalApiKey();
+        saveConfig({ ...existing, falApiKey: newApiKey });
+        success(`Fal API key saved to ${CONFIG_PATH}`);
+        return;
+    }
+
+    if (existing.apiKey || existing.geminiApiKey) {
+        info(`Existing Gemini API key found in ${CONFIG_PATH}.`);
     } else {
-        info('No saved API key found.');
+        info('No saved Gemini API key found.');
     }
 
     const newApiKey = await promptApiKey();
-    saveConfig({ ...existing, apiKey: newApiKey });
-    success(`API key saved to ${CONFIG_PATH}`);
+    saveConfig({ ...existing, apiKey: newApiKey, geminiApiKey: newApiKey });
+    success(`Gemini API key saved to ${CONFIG_PATH}`);
 }
 
 async function runGeneration(args) {
-    const apiKey = await ensureApiKey();
-    const generator = new GeminiGenerator({ apiKey });
+    const apiKey = await ensureApiKey(args.provider);
+    const generator = args.provider === 'fal'
+        ? new FalGenerator({ apiKey })
+        : new GeminiGenerator({ apiKey });
 
-    if (args.model === 'pro') {
+    if (args.provider === 'gemini') {
+        if (args.model === 'pro') {
+            generator.pro();
+        } else {
+            generator.flash();
+        }
+    } else if (args.model === 'banana-pro' || args.model === 'pro') {
         generator.pro();
     } else {
         generator.flash();
     }
 
+    if (args.provider === 'fal' && args.references.length === 0) {
+        throw new Error('Fal edit models require at least one --ref input image.');
+    }
+
     for (const ref of args.references) {
-        generator.addReference(ref.imagePath, ref.description);
+        if (typeof generator.addReference === 'function') {
+            generator.addReference(ref.imagePath, ref.description);
+        }
     }
 
     info('Generating image(s)...');
@@ -375,7 +476,7 @@ async function main() {
         }
 
         if (args.runConfig) {
-            await runConfigCommand();
+            await runConfigCommand(args.provider);
             return;
         }
 

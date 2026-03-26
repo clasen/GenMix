@@ -1,7 +1,7 @@
 {
   "name": "genmix",
-  "version": "1.1.5",
-  "description": "AI-powered image generator using Google Gemini API. Supports image generation from text prompts and image modification with reference images.",
+  "version": "1.2.2",
+  "description": "AI-powered image generator supporting Google Gemini and Fal Nano Banana 2.",
   "license": "MIT",
   "author": "Martin Clasen",
   "keywords": [
@@ -11,6 +11,9 @@
     "flash",
     "image-generator",
     "google-gemini",
+    "fal-ai",
+    "nano-banana-2",
+    "nano-banana-pro",
     "gemini-api",
     "text-to-image",
     "image-modification",
