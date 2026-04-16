@@ -1,4 +1,3 @@
-const axios = require('axios');
 const BaseGenerator = require('./BaseGenerator');
 const fs = require('fs');
 const path = require('path');
@@ -280,14 +279,26 @@ class FalGenerator extends BaseGenerator {
         payload.image_urls = imageUrls;
 
         try {
-            const response = await axios.post(this.apiUrl, payload, {
+            const response = await fetch(this.apiUrl, {
+                method: 'POST',
                 headers: {
                     Authorization: `Key ${this.apiKey}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify(payload)
             });
 
-            const result = await this.processResponse(response.data);
+            const responseBody = await this._parseResponseBody(response);
+            if (!response.ok) {
+                const apiError = responseBody && typeof responseBody === 'object' ? responseBody : null;
+                const message = apiError?.detail
+                    || apiError?.error
+                    || (typeof responseBody === 'string' ? responseBody : null)
+                    || `HTTP ${response.status} ${response.statusText}`;
+                throw new Error(message);
+            }
+
+            const result = await this.processResponse(responseBody);
             this.lastGeneration = {
                 prompt: String(prompt).trim(),
                 images: result.images,
@@ -300,9 +311,25 @@ class FalGenerator extends BaseGenerator {
             this.references = [];
             return result;
         } catch (error) {
-            const apiError = error.response?.data;
-            const message = apiError?.detail || apiError?.error || error.message;
-            throw new Error(`Fal API Error: ${message}`);
+            throw new Error(`Fal API Error: ${error.message}`);
+        }
+    }
+
+    async _parseResponseBody(response) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            return response.json();
+        }
+
+        const textBody = await response.text();
+        if (!textBody) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(textBody);
+        } catch (error) {
+            return textBody;
         }
     }
 
@@ -315,9 +342,14 @@ class FalGenerator extends BaseGenerator {
                 continue;
             }
 
-            const mediaResponse = await axios.get(entry.url, { responseType: 'arraybuffer' });
-            const contentType = entry.content_type || mediaResponse.headers['content-type'] || 'image/png';
-            const base64 = Buffer.from(mediaResponse.data).toString('base64');
+            const mediaResponse = await fetch(entry.url);
+            if (!mediaResponse.ok) {
+                throw new Error(`Failed to download generated media: HTTP ${mediaResponse.status} ${mediaResponse.statusText}`);
+            }
+
+            const binaryData = await mediaResponse.arrayBuffer();
+            const contentType = entry.content_type || mediaResponse.headers.get('content-type') || 'image/png';
+            const base64 = Buffer.from(binaryData).toString('base64');
             images.push(`data:${contentType};base64,${base64}`);
         }
 

@@ -1,6 +1,6 @@
 {
   "name": "genmix",
-  "version": "1.2.2",
+  "version": "1.2.4",
   "description": "AI-powered image generator supporting Google Gemini and Fal Nano Banana 2.",
   "license": "MIT",
   "author": "Martin Clasen",
@@ -25,6 +25,9 @@
   ],
   "type": "commonjs",
   "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "bin": {
     "genmix": "./cli.js"
   },
@@ -32,7 +35,6 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "axios": "^1.13.6",
     "hash-factory": "^1.1.2",
     "sharp": "^0.33.5"
   }

@@ -1,4 +1,3 @@
-const axios = require('axios');
 const BaseGenerator = require('./BaseGenerator');
 const fs = require('fs');
 const path = require('path');
@@ -183,9 +182,14 @@ class GeminiGenerator extends BaseGenerator {
             } else if (imageInput.startsWith('http://') || imageInput.startsWith('https://')) {
                 // It's a URL - download it
                 try {
-                    const response = await axios.get(imageInput, { responseType: 'arraybuffer' });
-                    base64Data = Buffer.from(response.data).toString('base64');
-                    mimeType = response.headers['content-type'] || 'image/png';
+                    const response = await fetch(imageInput);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+                    }
+
+                    const binaryData = await response.arrayBuffer();
+                    base64Data = Buffer.from(binaryData).toString('base64');
+                    mimeType = response.headers.get('content-type') || 'image/png';
                 } catch (error) {
                     throw new Error(`Failed to download reference image from URL: ${error.message}`);
                 }
@@ -405,20 +409,48 @@ class GeminiGenerator extends BaseGenerator {
         // data.tools = ... (removed)
 
         try {
-            const response = await axios.post(url, data, {
+            const response = await fetch(url, {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify(data),
             });
 
-            return this.processResponse(response.data);
-        } catch (error) {
-            const errorMessage = error.response?.data?.error?.message || error.message;
-            // Log detailed error for debugging
-            if (error.response?.data) {
-                console.error("API Error Details:", JSON.stringify(error.response.data, null, 2));
+            const responseBody = await this._parseResponseBody(response);
+            if (!response.ok) {
+                const apiError = responseBody && typeof responseBody === 'object' ? responseBody : null;
+                const errorMessage = apiError?.error?.message
+                    || (typeof responseBody === 'string' ? responseBody : null)
+                    || `HTTP ${response.status} ${response.statusText}`;
+
+                if (apiError) {
+                    console.error("API Error Details:", JSON.stringify(apiError, null, 2));
+                }
+                throw new Error(errorMessage);
             }
-            throw new Error(`Gemini API Error: ${errorMessage}`);
+
+            return this.processResponse(responseBody);
+        } catch (error) {
+            throw new Error(`Gemini API Error: ${error.message}`);
+        }
+    }
+
+    async _parseResponseBody(response) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            return response.json();
+        }
+
+        const textBody = await response.text();
+        if (!textBody) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(textBody);
+        } catch (error) {
+            return textBody;
         }
     }
 
