@@ -1,6 +1,6 @@
 {
   "name": "genmix",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "AI-powered image generator supporting Google Gemini and Fal Nano Banana 2.",
   "license": "MIT",
   "author": "Martin Clasen",
@@ -36,6 +36,6 @@
   },
   "dependencies": {
     "hash-factory": "^1.1.2",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.3"
   }
 }
