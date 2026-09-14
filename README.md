@@ -1,6 +1,6 @@
 # 🎨 GenMix
 
-AI-powered image generator supporting Google Gemini and Fal Nano Banana 2. Supports image generation from text prompts and image modification with reference images (Gemini).
+AI-powered image generator supporting Google Gemini, Fal Nano Banana 2, and OpenAI GPT Image 2.5. Supports image generation from text prompts and image modification with reference images (Gemini).
 
 ## Features ✨
 
@@ -34,6 +34,41 @@ FAL_API_KEY=your_fal_api_key_here
 ```
 
 `GEMINI_API_KEY` is used with provider `gemini` and `FAL_API_KEY` is used with provider `fal`.
+
+## OpenAI GPT Image 2.5
+
+Set `OPENAI_API_KEY` in your environment (the CLI does not persist OpenAI keys).
+
+```javascript
+const { OpenAIGenerator, OPENAI_MODELS } = require('genmix');
+const generator = new OpenAIGenerator(); // Sunburst by default
+await generator.generate('A watercolor city', { quality: 'high' });
+await generator.save({ filename: 'city', extension: 'png' });
+
+await generator.flare().addReference('./city.png', 'Preserve the buildings')
+  .generate('Change the scene to winter', { quality: 'xhigh' });
+await generator.save({ filename: 'winter', extension: 'png' });
+```
+
+`OPENAI_MODELS.SUNBURST` and `OPENAI_MODELS.FLARE` can also be passed as
+`modelId` in the constructor. Use `.sunburst()` or `.flare()` to switch models.
+References accept local paths, URLs, image data URIs, or Buffers (PNG/JPEG/WebP).
+Successful generation clears queued references; failed requests retain them.
+
+```bash
+genmix "A watercolor city" --provider openai -m sunburst -q high -o city.png
+genmix "Change to winter" --provider openai -m flare --ref city.png -o winter.png
+```
+
+OpenAI quality values are `low`, `medium`, `high`, `xhigh`, `max`, and `auto`
+(default). `numberOfImages` accepts 1–10. `aspectRatio` accepts ratios from 1:3
+to 3:1; generation dimensions approximate that ratio on a 16-pixel grid around
+one megapixel. With no ratio or dimensions, the API chooses the size.
+`width` and `height` set the final dimensions when saving with Sharp, and guide
+the generated aspect ratio. Images are returned as PNG data URIs with the raw API
+response (including usage) in `raw`. Generation and editing use the Image API.
+
+Official documentation: [GPT Image generation](https://developers.openai.com/api/docs/guides/image-generation).
 
 ## Basic Usage
 

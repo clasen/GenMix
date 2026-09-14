@@ -6,6 +6,7 @@ const os = require('os');
 const readline = require('readline');
 const GeminiGenerator = require('./generators/GeminiGenerator');
 const FalGenerator = require('./generators/FalGenerator');
+const OpenAIGenerator = require('./generators/OpenAIGenerator');
 
 const CONFIG_DIR = path.join(os.homedir(), '.genmix');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
@@ -89,13 +90,14 @@ Usage:
   genmix --help
 
 Options:
-  -p, --provider <gemini|fal> Provider (default: gemini)
+  -p, --provider <gemini|fal|openai> Provider (default: gemini)
   -n, --number <N>        Number of images (default: 1)
-  -q, --quality <1K|2K|4K> Image quality (default: 1K)
-  -r, --ratio <ratio>     Aspect ratio (default: 1:1 for gemini, auto for fal)
+  -q, --quality <quality> Image quality (Gemini/Fal default: 1K; OpenAI: low|medium|high|xhigh|max|auto)
+  -r, --ratio <ratio>     Aspect ratio (default: 1:1 for gemini, auto for fal/openai)
   --width <px>            Final output width in pixels (requires --height)
   --height <px>           Final output height in pixels (requires --width)
   -m, --model <...>       Model by provider:
+                          openai -> sunburst|flare (default: sunburst)
                           gemini -> pro|flash (default: flash)
                           fal -> pro|flash (aliases: banana-pro|banana2|2, default: flash)
   -o, --output <path>     Output directory OR full output file path
@@ -147,7 +149,7 @@ function parseArgs(argv) {
         references: [],
         provider: 'gemini',
         numberOfImages: 1,
-        quality: '1K',
+        quality: null,
         aspectRatio: null,
         aspectRatioWasProvided: false,
         model: null,
@@ -267,14 +269,19 @@ function parseArgs(argv) {
         throw new Error('Number of images must be a positive integer.');
     }
 
-    const quality = parsed.quality.toUpperCase();
-    if (!['1K', '2K', '4K'].includes(quality)) {
+    const quality = (parsed.quality || (parsed.provider === 'openai' ? 'auto' : '1K')).toUpperCase();
+    if (parsed.provider !== 'openai' && !['1K', '2K', '4K'].includes(quality)) {
         throw new Error('Quality must be one of: 1K, 2K, 4K.');
     }
-    parsed.quality = quality;
+    parsed.quality = parsed.provider === 'openai' ? quality.toLowerCase() : quality;
 
-    if (!['gemini', 'fal'].includes(parsed.provider)) {
-        throw new Error('Provider must be "gemini" or "fal".');
+    if (!['gemini', 'fal', 'openai'].includes(parsed.provider)) {
+        throw new Error('Provider must be "gemini", "fal", or "openai".');
+    }
+
+    if (parsed.provider === 'openai') {
+        if (!parsed.modelWasProvided) parsed.model = 'sunburst';
+        if (!['sunburst', 'flare'].includes(parsed.model)) throw new Error('OpenAI model must be sunburst or flare.');
     }
 
     if (parsed.provider === 'gemini' && !parsed.modelWasProvided) {
@@ -313,7 +320,7 @@ function parseArgs(argv) {
     }
 
     if (!parsed.aspectRatioWasProvided && !hasTargetDimensions) {
-        parsed.aspectRatio = parsed.provider === 'fal' ? 'auto' : '1:1';
+        parsed.aspectRatio = parsed.provider !== 'gemini' ? 'auto' : '1:1';
     }
 
     for (const ref of parsed.references) {
@@ -348,6 +355,12 @@ function resolveOutput(outputArg, format) {
 
 async function ensureApiKey(provider = 'gemini') {
     const config = loadConfig();
+
+    if (provider === 'openai') {
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey || !apiKey.trim()) throw new Error('Set OPENAI_API_KEY to use the OpenAI provider.');
+        return apiKey.trim();
+    }
 
     if (provider === 'fal') {
         const envApiKey = process.env.FAL_API_KEY;
@@ -384,6 +397,10 @@ async function ensureApiKey(provider = 'gemini') {
 }
 
 async function runConfigCommand(provider) {
+    if (provider === 'openai') {
+        info('Set OPENAI_API_KEY in your environment to configure OpenAI.');
+        return;
+    }
     const existing = loadConfig();
     if (provider === 'fal') {
         if (existing.falApiKey) {
@@ -413,9 +430,13 @@ async function runGeneration(args) {
     const apiKey = await ensureApiKey(args.provider);
     const generator = args.provider === 'fal'
         ? new FalGenerator({ apiKey })
-        : new GeminiGenerator({ apiKey });
+        : args.provider === 'openai'
+            ? new OpenAIGenerator({ apiKey })
+            : new GeminiGenerator({ apiKey });
 
-    if (args.provider === 'gemini') {
+    if (args.provider === 'openai') {
+        generator[args.model]();
+    } else if (args.provider === 'gemini') {
         if (args.model === 'pro') {
             generator.pro();
         } else {

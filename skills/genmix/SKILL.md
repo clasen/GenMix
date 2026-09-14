@@ -1,6 +1,6 @@
 ---
 name: genmix
-description: AI-powered image generator using Google Gemini API. Use this skill when the user asks to generate an image from text, modify an existing image with a reference, apply style transfer, or create an image based on a prompt.
+description: AI-powered image generator using Google Gemini, Fal, or OpenAI GPT Image 2.5. Use this skill when the user asks to generate an image from text, modify an existing image with a reference, apply style transfer, or create an image based on a prompt.
 ---
 
 # GenMix Skill
@@ -49,3 +49,11 @@ Actions: Create a script using GenMix to generate the image with the prompt "A f
 **Example 2: Modify an image**
 User says: "Make this portrait look like a watercolor painting"
 Actions: Create a script using GenMix, add the portrait as a reference image, use the prompt "Transform this photo into a watercolor painting", run the script, and save the output.
+
+## OpenAI GPT Image 2.5
+
+Use `OpenAIGenerator` with `OPENAI_API_KEY` for GPT Image 2.5. Sunburst is the
+default; `.flare()` selects Flare and `.sunburst()` switches back. Use the same
+`addReference()`, `generate()`, and `save()` flow. Quality accepts `low`, `medium`,
+`high`, `xhigh`, `max`, or `auto`, not Gemini resolution labels. CLI example:
+`genmix "A watercolor city" --provider openai -m sunburst -q high -o city.png`.
